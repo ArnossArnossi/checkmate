@@ -78,6 +78,7 @@ plugins = {
            'pylint' : 'checkmate.contrib.plugins.python.pylint',
            'pyflakes' : 'checkmate.contrib.plugins.python.pyflakes',
            'jshint' : 'checkmate.contrib.plugins.javascript.jshint',
+           'phpmd' : 'checkmate.contrib.plugins.php.phpmd',
            'metrics' : 'checkmate.contrib.plugins.python.metrics',
            'git' : 'checkmate.contrib.plugins.git',
            }
