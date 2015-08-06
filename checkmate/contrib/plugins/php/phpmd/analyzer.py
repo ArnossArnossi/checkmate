@@ -42,21 +42,27 @@ class PHPMDAnalyzer(BaseAnalyzer):
                 raise AnalyzerSettingsError("enable and disable cannot be set simultaneously.")
 
     def analyze(self,file_revision):
-
         issues = []
         f = tempfile.NamedTemporaryFile(delete = False)
-        rule_set_default = ["cleancode",
+        rule_sets_default = ["cleancode",
                             "codesize",
                             "naming",
                             "controversial",
                             "design",
                             "unusedcode"]
 
+        translate_categories = {"Naming Rules": ["readability"],
+                              "Clean Code Rules": ["readability"],
+                              "Controversial Rules": ["readability"],
+                              "Code Size Rules": ["maintainability", "performance"],
+                              "Unused Code Rules": ["performance"]
+                              "Design Rules": ["maintainability","readability"]
+
         if "enable" in self.settings:
             rule_sets = [val for val in self.settings["enable"]]
         elif "disable" in self.settings:
-            [rule_set_default.remove(val) for val in self.settings["disable"]]
-            rule_sets = rule_set_default
+            [rule_sets_default.remove(val) for val in self.settings["disable"]]
+            rule_sets = rule_sets_default
         elif not self.settings:
             rule_sets = []
         
@@ -76,12 +82,19 @@ class PHPMDAnalyzer(BaseAnalyzer):
             dict_result = xmltodict.parse(result)
 
             for issue in dict_result["pmd"]["file"]["violation"]:
+                prior = issue["@priority"]
+                prior = 4 if prior==5 else prior
+                category = translate_categories[issue["@ruleset"]]
+
                 issues.append({
                     "code": issue["@rule"],
                     "location": ((issue["@beginline"], None),
                                  (issue["@beginline"], None)),
-                    "data": issue})
-
+                    "data": {"raw": issue
+                             "description": issue["#text"],
+                             "severity": prior,
+                             "category": category}
+                             })
         finally:
             os.unlink(f.name)
         return {'issues' : issues}
