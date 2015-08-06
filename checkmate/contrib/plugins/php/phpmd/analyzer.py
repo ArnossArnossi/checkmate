@@ -26,28 +26,40 @@ import tempfile
 import subprocess
 import xmltodict
 
-from checkmate.lib.analysis.base import BaseAnalyzer
+from checkmate.lib.analysis.base import BaseAnalyzer, AnalyzerSettingsError
 
 class PHPMDAnalyzer(BaseAnalyzer):
 
-    def __init__(self):
-        # rule_sets is initialised at this point for possible future
-        # exposure to the user
-        self.rule_sets = ["cleancode",
-                          "codesize",
-                          "naming",
-                          "controversial",
-                          "design",
-                          "unusedcode"]
-         
     def summarize(self,items):
         pass
 
+    @classmethod
+    def validate_settings(cls, settings):
+        for key in settings.iterkeys():
+            if key not in ["enable", "disable"]:
+                raise AnalyzerSettingsError("first keys needs to be either enable, disable")
+            if "enable" in self.settings.keys() and "disable" in self.settings.keys():
+                raise AnalyzerSettingsError("enable and disable cannot be set simultaneously.")
 
     def analyze(self,file_revision):
 
         issues = []
         f = tempfile.NamedTemporaryFile(delete = False)
+        rule_set_default = ["cleancode",
+                            "codesize",
+                            "naming",
+                            "controversial",
+                            "design",
+                            "unusedcode"]
+
+        if "enable" in self.settings:
+            rule_sets = [val for val in self.settings["enable"]]
+        elif "disable" in self.settings:
+            [rule_set_default.remove(val) for val in self.settings["disable"]]
+            rule_sets = rule_set_default
+        elif not self.settings:
+            rule_sets = []
+        
         try:
             with f:
                 f.write(file_revision.get_file_content())
@@ -55,7 +67,7 @@ class PHPMDAnalyzer(BaseAnalyzer):
                 result = subprocess.check_output(["phpmd",
                                                   f.name,
                                                   "xml"
-                                                  ]+self.rule_sets)
+                                                  ]+ rule_sets)
             except subprocess.CalledProcessError as e:
                 if e.returncode in [1,2]:
                     result = e.output
