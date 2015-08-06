@@ -52,11 +52,12 @@ class PHPMDAnalyzer(BaseAnalyzer):
                             "unusedcode"]
 
         translate_categories = {"Naming Rules": ["readability"],
-                              "Clean Code Rules": ["readability"],
-                              "Controversial Rules": ["readability"],
-                              "Code Size Rules": ["maintainability", "performance"],
-                              "Unused Code Rules": ["performance"]
-                              "Design Rules": ["maintainability","readability"]
+                                "Clean Code Rules": ["readability"],
+                                "Controversial Rules": ["readability"],
+                                "Code Size Rules": ["maintainability", "performance"],
+                                "Unused Code Rules": ["performance"],
+                                "Design Rules": ["maintainability","readability"]
+                               }
 
         if "enable" in self.settings:
             rule_sets = [val for val in self.settings["enable"]]
@@ -88,9 +89,9 @@ class PHPMDAnalyzer(BaseAnalyzer):
 
                 issues.append({
                     "code": issue["@rule"],
-                    "location": ((issue["@beginline"], None),
+                    "location": ((issue["@beginline"], 0),
                                  (issue["@beginline"], None)),
-                    "data": {"raw": issue
+                    "data": {"raw": issue,
                              "description": issue["#text"],
                              "severity": prior,
                              "category": category}
