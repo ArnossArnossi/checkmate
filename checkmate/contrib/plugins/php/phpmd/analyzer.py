@@ -99,22 +99,38 @@ class PHPMDAnalyzer(BaseAnalyzer):
                     result = e.output
                 else:
                     raise
-            dict_result = xmltodict.parse(result)
+            dict_result = xmltodict.parse(result)["pmd"]
 
-            for issue in dict_result["pmd"]["file"]["violation"]:
-                prior = issue["@priority"]
-                prior = 4 if prior==5 else prior
-                category = translate_categories[issue["@ruleset"]]
+            # get syntax errors
+            if "error" in dict_result:
+                msg = dict_result["error"]["@msg"]
+                split_msg = msg.split(", ")
+                description = split_msg[0]
+                line = int(split_msg[1][-1])
+                col = int(split_msg[2][-1])
+                issues.append({"code": "SyntaxError",
+                               "location": ((line, col),
+                                            (line, None)),
+                               "data": {"description": description,}
+                              })
 
-                issues.append({
-                    "code": issue["@rule"],
-                    "location": ((issue["@beginline"], 0),
-                                 (issue["@beginline"], None)),
-                    "data": {"raw": issue,
-                             "description": issue["#text"],
-                             "severity": prior,
-                             "category": category}
-                             })
+            # get regular issues
+            if "file" in dict_result:
+                for issue in dict_result["file"]["violation"]:
+                    prior = issue["@priority"]
+                    prior = 4 if prior==5 else prior
+                    category = translate_categories[issue["@ruleset"]]
+
+                    issues.append({
+                        "code": issue["@rule"],
+                        "location": ((issue["@beginline"], 0),
+                                     (issue["@beginline"], None)),
+                        "data": {"raw": issue,
+                                 "description": issue["#text"],
+                                 "severity": prior,
+                                 "category": category,
+                                 "url_to_issue": issue["@externalInfoUrl"]}
+                                  })
         finally:
             os.unlink(f.name)
         return {'issues' : issues}
