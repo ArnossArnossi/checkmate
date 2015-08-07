@@ -24,9 +24,14 @@ from __future__ import absolute_import
 import os
 import tempfile
 import subprocess
-import xmltodict
+import logging
+import re
 
+
+import xmltodict
 from checkmate.lib.analysis.base import BaseAnalyzer, AnalyzerSettingsError
+
+logger = logging.getLogger(__name__)
 
 class PHPMDAnalyzer(BaseAnalyzer):
 
@@ -37,19 +42,34 @@ class PHPMDAnalyzer(BaseAnalyzer):
     def validate_settings(cls, settings):
         for key in settings.iterkeys():
             if key not in ["enable", "disable"]:
-                raise AnalyzerSettingsError("first keys needs to be either enable, disable")
+                raise AnalyzerSettingsError("first keys needs to be either enable or disable")
             if "enable" in self.settings.keys() and "disable" in self.settings.keys():
                 raise AnalyzerSettingsError("enable and disable cannot be set simultaneously.")
 
-    def analyze(self,file_revision):
-        issues = []
-        f = tempfile.NamedTemporaryFile(delete = False)
+    def _set_rule_sets(self):
         rule_sets_default = ["cleancode",
                             "codesize",
                             "naming",
                             "controversial",
                             "design",
                             "unusedcode"]
+        if not self.settings:
+            rule_sets = rule_sets_default
+        elif "enable" in self.settings:
+            # if val is not in rule_set_default an exception could be raised
+            # which tells the user that the setting is wrong
+            # right now it just doesnt get enabled
+            rule_sets = [val for val in self.settings["enable"]
+                         if val in rule_sets_default]
+        elif "disable" in self.settings:
+            [rule_sets_default.remove(val) for val in self.settings["disable"]]
+            rule_sets = rule_sets_default
+
+        return ",".join(rule_sets)
+
+    def analyze(self,file_revision):
+        issues = []
+        f = tempfile.NamedTemporaryFile(delete = False)
 
         translate_categories = {"Naming Rules": ["readability"],
                                 "Clean Code Rules": ["readability"],
@@ -58,25 +78,24 @@ class PHPMDAnalyzer(BaseAnalyzer):
                                 "Unused Code Rules": ["performance"],
                                 "Design Rules": ["maintainability","readability"]
                                }
+        rule_sets_str = self._set_rule_sets()
 
-        if "enable" in self.settings:
-            rule_sets = [val for val in self.settings["enable"]]
-        elif "disable" in self.settings:
-            [rule_sets_default.remove(val) for val in self.settings["disable"]]
-            rule_sets = rule_sets_default
-        elif not self.settings:
-            rule_sets = []
-        
         try:
             with f:
                 f.write(file_revision.get_file_content())
             try:
-                result = subprocess.check_output(["phpmd",
-                                                  f.name,
-                                                  "xml"
-                                                  ]+ rule_sets)
+                if os.path.isfile(f.name):
+                    result = subprocess.check_output(["phpmd",
+                                                      f.name,
+                                                      "xml",
+                                                      rule_sets_str
+                                                     ])
+                else:
+                    logger.warn("File at path: {} cannot be found by analyzer. returning empty dict"
+                                .format(f.name))
+                    return {"issues": {}}
             except subprocess.CalledProcessError as e:
-                if e.returncode in [1,2]:
+                if e.returncode==2:
                     result = e.output
                 else:
                     raise
